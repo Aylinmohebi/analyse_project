@@ -36,8 +36,11 @@ GOLD_API_URL = "https://api.tgju.org/v1/market/indicator/summary-table-data/gera
 import requests
 from bs4 import BeautifulSoup
 
+import requests
+from bs4 import BeautifulSoup
+
 def get_gold_price():
-    """گرفتن قیمت طلا مستقیم از HTML سایت TGJU (پایدارتر)"""
+    """گرفتن نرخ فعلی طلا مستقیم از سایت TGJU"""
     url = "https://www.tgju.org/"
     
     try:
@@ -49,25 +52,29 @@ def get_gold_price():
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # پیدا کردن ردیف مربوط به طلای ۱۸ عیار توی جدول
-            # طبق ساختار سایت، این ردیف ویژگی data-market-row با مقدار geram18 داره
+            # پیدا کردن المانی که دقیقاً نرخ فعلی (اون عدد بزرگ) رو داره
+            # توی سایت TGJU این تگ با ویژگی data-col="info_last" مشخص میشه
+            price_element = soup.find('span', {'data-col': 'info_last', 'data-market-row': 'geram18'})
+            
+            if price_element:
+                # گرفتن متن و پاک کردن کاماها
+                raw_price = price_element.text.strip()
+                clean_price = int(raw_price.replace(',', ''))
+                
+                # تبدیل ریال به تومان (تقسیم بر ۱۰)
+                price_toman = clean_price // 10
+                return f"{price_toman:,}"
+                
+            # اگر تگ span پیدا نشد، شاید توی تگ td باشه (بک‌آپ)
             row = soup.find('tr', {'data-market-row': 'geram18'})
-            
             if row:
-                # خوندن مقدار قیمت از خونه‌ی مربوطه
-                tds = row.find_all('td')
-                if len(tds) > 0:
-                    # اولین td معمولاً قیمت لحظه‌ای رو داره (به ریال)
-                    raw_price = tds[0].text.strip() # مثلا "24,553,000"
-                    
-                    # پاک کردن کاما و تبدیل به عدد
-                    clean_price = int(raw_price.replace(',', ''))
-                    
-                    # تبدیل به تومان (تقسیم بر ۱۰)
-                    price_toman = clean_price // 10
-                    return f"{price_toman:,}"
-            
-            return "قیمت پیدا نشد"
+                # اون عدد بزرگ معمولا توی دومین td با کلاس info_last هست
+                td = row.find('td', {'class': 'info_last'})
+                if td:
+                    clean_price = int(td.text.strip().replace(',', ''))
+                    return f"{(clean_price // 10):,}"
+
+            return "قیمت فعلی پیدا نشد"
         else:
             return f"خطای سرور: {response.status_code}"
             
