@@ -36,37 +36,52 @@ GOLD_API_URL = "https://api.tgju.org/v1/market/indicator/summary-table-data/gera
 import requests
 from bs4 import BeautifulSoup
 
+
 def get_gold_price():
-    url = "https://www.tgju.org/"
+    # آدرس صفحه‌ی طلای ۱۸ عیار
+    url = "https://www.tgju.org/profile/geram18"
+    
     try:
+        # 👇 نکته‌ی کلیدی: ما خودمون رو شبیه یه گوشی موبایل (آیفون) معرفی می‌کنیم 
+        # تا سایت دقیقاً همون HTML ای رو بفرسته که توی عکس اینسپکت دیدی
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
         }
+        
         response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # ۱. پیدا کردن ردیف مربوط به طلای ۱۸ عیار
-            row = soup.find('tr', {'data-market-row': 'geram18'})
+            # 👇 دقیقاً همون ویژگی‌ای که توی عکس مشخص کردی
+            price_element = soup.find('span', {'data-col': 'info.last_trade.PDrCotVal'})
             
-            if row:
-                # ۲. توی این ردیف، اولین سلولی که کلاس nf داره (همون عدد درشت) رو پیدا کن
-                price_cell = row.find('td', class_='nf')
+            if price_element:
+                raw_price = price_element.text.strip()
+                # پاک کردن کاما (242,867,000 -> 242867000)
+                clean_price = int(raw_price.replace(',', ''))
                 
-                if price_cell:
-                    raw_price = price_cell.text.strip()
-                    # پاک کردن کاما و تبدیل به عدد
-                    clean_price = int(raw_price.replace(',', ''))
-                    # تبدیل به تومان
-                    return f"{(clean_price // 10):,}"
+                # تبدیل ریال به تومان (تقسیم بر ۱۰)
+                price_toman = clean_price // 10
+                
+                return f"{price_toman:,}"
             
+            # اگه تگ پیدا نشد، بک‌آپ: بریم سراغ ویژگی data-market-row
+            # (شاید سایت ما رو فرستاد به نسخه دسکتاپ)
+            row = soup.find('tr', {'data-market-row': 'geram18'})
+            if row:
+                td = row.find('td', class_='nf')
+                if td:
+                    clean_price = int(td.text.strip().replace(',', ''))
+                    return f"{(clean_price // 10):,}"
+                    
             return "قیمت پیدا نشد"
         else:
             return f"خطای سرور: {response.status_code}"
             
     except Exception as e:
         return f"خطای اتصال: {e}"
+                
 def run_scheduler():
     schedule.every(60).minutes.do(job)
    
