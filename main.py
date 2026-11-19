@@ -36,13 +36,8 @@ GOLD_API_URL = "https://api.tgju.org/v1/market/indicator/summary-table-data/gera
 import requests
 from bs4 import BeautifulSoup
 
-import requests
-from bs4 import BeautifulSoup
-
 def get_gold_price():
-    """گرفتن نرخ فعلی طلا مستقیم از سایت TGJU"""
     url = "https://www.tgju.org/"
-    
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -52,48 +47,26 @@ def get_gold_price():
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # پیدا کردن المانی که دقیقاً نرخ فعلی (اون عدد بزرگ) رو داره
-            # توی سایت TGJU این تگ با ویژگی data-col="info_last" مشخص میشه
-            price_element = soup.find('span', {'data-col': 'info_last', 'data-market-row': 'geram18'})
-            
-            if price_element:
-                # گرفتن متن و پاک کردن کاماها
-                raw_price = price_element.text.strip()
-                clean_price = int(raw_price.replace(',', ''))
-                
-                # تبدیل ریال به تومان (تقسیم بر ۱۰)
-                price_toman = clean_price // 10
-                return f"{price_toman:,}"
-                
-            # اگر تگ span پیدا نشد، شاید توی تگ td باشه (بک‌آپ)
+            # ۱. پیدا کردن ردیف مربوط به طلای ۱۸ عیار
             row = soup.find('tr', {'data-market-row': 'geram18'})
+            
             if row:
-                # اون عدد بزرگ معمولا توی دومین td با کلاس info_last هست
-                td = row.find('td', {'class': 'info_last'})
-                if td:
-                    clean_price = int(td.text.strip().replace(',', ''))
+                # ۲. توی این ردیف، اولین سلولی که کلاس nf داره (همون عدد درشت) رو پیدا کن
+                price_cell = row.find('td', class_='nf')
+                
+                if price_cell:
+                    raw_price = price_cell.text.strip()
+                    # پاک کردن کاما و تبدیل به عدد
+                    clean_price = int(raw_price.replace(',', ''))
+                    # تبدیل به تومان
                     return f"{(clean_price // 10):,}"
-
-            return "قیمت فعلی پیدا نشد"
+            
+            return "قیمت پیدا نشد"
         else:
             return f"خطای سرور: {response.status_code}"
             
     except Exception as e:
         return f"خطای اتصال: {e}"
-def job():
-    print("در حال دریافت قیمت...")
-    price = get_gold_price()
-    message = f"💰 قیمت لحظه‌ای طلا (۱۸ عیار):\n{price} تومان"
-    
-    
-    if CHAT_ID:
-        try:
-            bot.send_message(CHAT_ID, message)
-            print(f"ارسال شد: {price} تومان")
-        except Exception as e:
-            print(f"خطا در ارسال: {e}")
-
-
 def run_scheduler():
     schedule.every(60).minutes.do(job)
    
