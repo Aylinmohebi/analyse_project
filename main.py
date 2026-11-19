@@ -33,30 +33,41 @@ bot = telebot.TeleBot(API_TOKEN)
 GOLD_API_URL = "https://api.tgju.org/v1/market/indicator/summary-table-data/geram18"
 
 
+import requests
+from bs4 import BeautifulSoup
+
 def get_gold_price():
-    """گرفتن قیمت طلا از TGJU"""
+    """گرفتن قیمت طلا مستقیم از HTML سایت TGJU (پایدارتر)"""
+    url = "https://www.tgju.org/"
+    
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        response = requests.get(GOLD_API_URL, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=15)
         
         if response.status_code == 200:
-            data = response.json()
+            soup = BeautifulSoup(response.text, 'html.parser')
             
-            gold_list = data.get("data", [])
+            # پیدا کردن ردیف مربوط به طلای ۱۸ عیار توی جدول
+            # طبق ساختار سایت، این ردیف ویژگی data-market-row با مقدار geram18 داره
+            row = soup.find('tr', {'data-market-row': 'geram18'})
             
-            if gold_list:
-                raw_price = gold_list[0][0] # مثلا "245,660,000"
-                
-                clean_price = int(raw_price.replace(",", ""))
-                
-             
-                price_toman = clean_price // 10
-                return f"{price_toman:,}"
-            else:
-                return "داده‌ای یافت نشد"
+            if row:
+                # خوندن مقدار قیمت از خونه‌ی مربوطه
+                tds = row.find_all('td')
+                if len(tds) > 0:
+                    # اولین td معمولاً قیمت لحظه‌ای رو داره (به ریال)
+                    raw_price = tds[0].text.strip() # مثلا "24,553,000"
+                    
+                    # پاک کردن کاما و تبدیل به عدد
+                    clean_price = int(raw_price.replace(',', ''))
+                    
+                    # تبدیل به تومان (تقسیم بر ۱۰)
+                    price_toman = clean_price // 10
+                    return f"{price_toman:,}"
+            
+            return "قیمت پیدا نشد"
         else:
             return f"خطای سرور: {response.status_code}"
             
