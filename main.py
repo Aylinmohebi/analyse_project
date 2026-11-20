@@ -87,7 +87,7 @@ def run_scheduler():
     #schedule.every(120).minutes.do(job)
     
     
-     schedule.every(1).minutes.do(job)
+    schedule.every(1).minutes.do(job)
     
     while True:
         schedule.run_pending()
